@@ -1,0 +1,657 @@
+Saving Image into Database
+=================================================================
+
+Project File Check List:
+
+pom.xml
+
+application.properties
+
+Java Files:
+
+	- Category.java
+	- CategoryController.java
+	- CategoryRepository.java
+
+Templates:
+	fragments:
+		- header.html
+		- footer.html
+
+	category:
+		- index.html
+		- create.html
+		- edit.html
+
+
+=====================================================================
+
+
+
+
+	<dependencies>
+
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-jpa</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-thymeleaf</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-validation</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-web</artifactId>
+		</dependency>
+
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-devtools</artifactId>
+			<scope>runtime</scope>
+			<optional>true</optional>
+		</dependency>
+		<dependency>
+			<groupId>com.mysql</groupId>
+			<artifactId>mysql-connector-j</artifactId>
+			<scope>runtime</scope>
+		</dependency>
+		<dependency>
+		    <groupId>org.webjars</groupId>
+		    <artifactId>bootstrap</artifactId>
+		    <version>5.0.1</version>
+		</dependency>
+		<dependency>
+		    <groupId>org.webjars</groupId>
+		    <artifactId>font-awesome</artifactId>
+		    <version>6.4.2</version>
+		</dependency>
+		<dependency>
+		    <groupId>org.webjars</groupId>
+		    <artifactId>jquery</artifactId>
+		    <version>3.7.1</version>
+		</dependency>
+		
+		<dependency>
+			<groupId>org.webjars</groupId>
+			<artifactId>webjars-locator-core</artifactId>
+		</dependency>
+
+		<dependency>
+			<groupId>org.projectlombok</groupId>
+			<artifactId>lombok</artifactId>
+			<optional>true</optional>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+
+	</dependencies>
+
+
+=================================================================
+
+
+
+
+
+spring.datasource.url=jdbc:mysql://localhost:3306/jpadb
+spring.datasource.username=root
+spring.datasource.password=Admin@123
+
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.show-sql=true
+
+
+
+=============================================================
+
+
+Category.java
+------------
+
+
+package com.example.demo;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Lob;
+
+@Entity(name="categories")
+public class Category {
+
+	@Id
+	@GeneratedValue(strategy=GenerationType.IDENTITY)
+	private Long id;
+	
+	private String name;
+
+	@Lob
+	@Column(columnDefinition = "MEDIUMBLOB")
+	private String image;
+	
+	public Long getId() {
+		return id;
+	}
+	public void setId(Long id) {
+		this.id = id;
+	}
+	public String getName() {
+		return name;
+	}
+	public void setName(String name) {
+		this.name = name;
+	}
+	
+	public String getImage() {
+		return image;
+	}
+	public void setImage(String image) {
+		this.image = image;
+	}
+	public Category(Long id, String name, String image) {
+		super();
+		this.id = id;
+		this.name = name;
+		
+		this.image = image;
+	}
+	public Category() {
+		super();
+	}
+	
+		
+}
+
+
+
+========================================================
+
+
+CategoryController.java
+----------------------
+
+package com.example.demo;
+
+import java.io.IOException;
+import java.util.Base64;
+import java.util.Optional;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.util.StringUtils;
+import org.springframework.validation.BindingResult;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.multipart.MultipartFile;
+
+import jakarta.validation.Valid;
+
+@Controller
+@RequestMapping("/cat")
+public class CategoryController {
+	
+	@Autowired
+	CategoryRepository categoryRepo;
+	
+	@GetMapping("/")
+	public String categoryPage(Model model) {
+		
+		model.addAttribute("categories",categoryRepo.findAll());
+		return "category/index";
+		
+	}
+	
+	@GetMapping("/create")
+	public String categoryCreatePage(Model model) {
+		
+		model.addAttribute("category",new Category());
+		return "category/create";
+		
+	}
+	
+	@GetMapping("/edit")
+	public String categoryEditPage(@RequestParam("id") Long id,Model model) {
+		
+		Optional<Category> cat=categoryRepo.findById(id);
+		model.addAttribute("category",cat);
+		model.addAttribute("img",cat.get().getImage());
+		
+		return "category/edit";
+		
+	}
+	
+	@PostMapping("/submit")
+	public String categorySubmit(@Valid @ModelAttribute("category") Category cat,@RequestParam("photo") MultipartFile file, BindingResult bindingResult) {
+		
+		if(bindingResult.hasErrors()) {
+			return "category/create";
+		}
+		
+		
+		
+		String fileName = StringUtils.cleanPath(file.getOriginalFilename());
+		if(fileName.contains(".."))
+		{
+			System.out.println("not a a valid file");
+		}
+		try {
+			cat.setImage(Base64.getEncoder().encodeToString(file.getBytes()));
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		
+		categoryRepo.save(cat);
+		
+		return "redirect:../cat/";
+		
+	}
+	
+	
+	@PostMapping("/update")
+	public String categoryUpdate(
+			                 @ModelAttribute("category") Category cat,
+			                 @RequestParam("new_photo") MultipartFile file) {
+		
+		
+		
+		Category updateCat=categoryRepo.getById(cat.getId());
+		
+		
+			String fileName = StringUtils.cleanPath(file.getOriginalFilename());
+			
+			System.out.println("File Name = "+fileName);
+			if(fileName.equals("")) {
+				updateCat.setName(cat.getName());
+				updateCat.setImage(cat.getImage());
+				categoryRepo.save(updateCat);
+				
+				System.out.println("File is empty...");
+			}
+			else {
+				
+				if(fileName.contains(".."))
+				{
+					System.out.println("not a a valid file");
+				}
+				try {
+					updateCat.setImage(Base64.getEncoder().encodeToString(file.getBytes()));
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			
+			updateCat.setName(cat.getName());
+			categoryRepo.save(updateCat);
+			
+			}
+			
+		
+		
+		
+		
+		return "redirect:../cat/";
+		
+	}
+	
+	@GetMapping("/delete")
+	public String categoryDeletePage(@RequestParam("id") Long id) {
+		
+		categoryRepo.deleteById(id);
+		
+		return "redirect:../cat/";
+		
+	}
+	
+	
+}
+
+========================================================
+
+
+
+CategoryRepositoyr.java
+-----------------------
+
+
+@Repository
+public interface CategoryRepository extends JpaRepository<Category,Long> {
+
+}
+
+
+===========================================================
+
+
+category
+	- index.html
+
+---------------------
+
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,minimum-scale=1.0" />
+  <title> Northern City </title>
+
+  <link rel="stylesheet" type="text/css" th:href="@{/webjars/bootstrap/css/bootstrap.min.css}" />
+  <link rel="stylesheet" type="text/css" th:href="@{/webjars/font-awesome/css/all.min.css}" />
+  <script type="text/javascript" th:src="@{/webjars/jquery/jquery.min.js}"></script>
+  <script type="text/javascript" th:src="@{/webjars/bootstrap/js/bootstrap.min.js}"></script>
+</head>
+
+<body>
+<div class="container my-2 p-2">	
+  <div th:replace="./fragments/header :: header"></div>
+</div>
+
+<div class="container p-2">
+	<a th:href="@{/cat/create}" class="btn btn-primary"> Create New Category </a>
+</div>
+<div class="container p-2">
+<table class="table table-striped">
+	<tr>
+		<td> Id  </td>
+		<td> Photo </td>
+		<td> Name </td>
+	
+		<td> Actions </td>
+	</tr>
+	<tr th:each="cat:${categories}">
+		<td th:text="${cat.id}"></td>
+		<td><img src="data:image/jpeg;base64," th:attrappend="src=${cat.image}" style="width:100px;height:auto;"> </td>
+		
+		<td th:text="${cat.name}"></td>
+		
+		<td>
+			<a th:href="@{/cat/edit(id=${cat.id})}" class="btn btn-warning"> <i class="fa fa-pencil"></i> Edit </a> | 
+			<a th:href="@{/cat/delete(id=${cat.id})}" th:catRec="${cat.name}" class="btn btn-danger btn-delete"
+    title="Delete this Record" data-bs-toggle="modal" data-bs-target="#confirmModal"><i class="fa fa-trash"></i>  Delete </a>
+		</td>
+	</tr>
+</table>
+</div>
+<div class="container my-2">	
+ <div th:replace="./fragments/footer :: footer"></div>
+ </div>
+ 
+ <!-- modal -->
+ 
+ <div class="modal fade text-center" id="confirmModal">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Delete Confirmation</h5>
+        <button type="button" class="close" data-bs-dismiss="modal">
+          <span aria-hidden="true">×</span>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <span id="confirmText"></span>
+      </div>
+
+      <div class="modal-footer">
+        <a type="button" id="yesBtn" class="btn btn-danger">Yes</a>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">No</button>
+      </div>
+    </div>
+  </div>
+ 
+ 
+ <script type="text/javascript">
+  $(document).ready(function () {
+    $(".btn-delete").on("click", function (e) {
+      e.preventDefault();
+      link = $(this);
+      catRec = link.attr("catRec");
+      $("#yesBtn").attr("href", link.attr("href"));
+      $("#confirmText").html("Do you want to delete the Category Record \<strong\>" + studentRec+ "\<\/strong\>?");
+      $("#confirmModal").modal();
+    });
+  });
+</script>
+</body>
+</html>
+
+====================================================
+
+template
+	- create.html
+-------------------
+
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,minimum-scale=1.0" />
+  <title> Northern City </title>
+
+  <link rel="stylesheet" type="text/css" th:href="@{/webjars/bootstrap/css/bootstrap.min.css}" />
+    <link rel="stylesheet" type="text/css" th:href="@{/webjars/font-awesome/css/all.min.css}" />
+  <script type="text/javascript" th:src="@{/webjars/jquery/jquery.min.js}"></script>
+  <script type="text/javascript" th:src="@{/webjars/bootstrap/js/bootstrap.min.js}"></script>
+</head>
+
+<body>
+<div class="container my-2 p-2">	
+  <div th:replace="./fragments/header :: header"></div>
+</div>
+
+<div class="container my-2 p-2">
+	<div class="row"> 
+		<div class="col-lg-6 p-5">
+<form th:action="@{/cat/submit}" method="post" th:object="${category}" enctype="multipart/form-data"> 
+<table class="table table-striped">
+	
+	<tr>
+		<td> Enter Category Name  </td>
+		<td> <input type="text" th:field="*{name}" class="form-control"> </td>
+		<td th:if="${#fields.hasErrors('name')}" th:errors="*{name}">Name Error</td>
+		
+	</tr>
+	
+	<tr>
+		<td> Enter Category Photo  </td>
+		<td> <input type="file" name="photo" class="form-control"> </td>
+		
+		
+	</tr>
+	<tr>
+		<td>   </td>
+		<td> <button type="submit" class="btn btn-outline-warning form-control"> Save </button> </td>
+		
+	</tr>
+	
+</table>
+
+</form>
+
+    </div>
+    <div class="col-lg-6 p-5 text-center"> 
+		<i class="fa-solid fa-user-circle" style="font-size:100px;color:black;"></i>
+	</div>
+</div>
+</div>
+</body>
+</html>
+
+=====================================================
+
+template
+	- edit.html
+---------------------
+
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,minimum-scale=1.0" />
+  <title> Northern City </title>
+
+  <link rel="stylesheet" type="text/css" th:href="@{/webjars/bootstrap/css/bootstrap.min.css}" />
+    <link rel="stylesheet" type="text/css" th:href="@{/webjars/font-awesome/css/all.min.css}" />
+  <script type="text/javascript" th:src="@{/webjars/jquery/jquery.min.js}"></script>
+  <script type="text/javascript" th:src="@{/webjars/bootstrap/js/bootstrap.min.js}"></script>
+</head>
+
+<body>
+<div class="container my-2 p-2">	
+  <div th:replace="./fragments/header :: header"></div>
+</div>
+
+<div class="container my-2 p-2">
+	<div class="row"> 
+		<div class="col-lg-6 p-5">
+<form th:action="@{/cat/update}" method="post" th:object="${category}" enctype="multipart/form-data"> 
+<table class="table table-striped">
+	<input type="hidden" name="id" th:field="*{id}" th:value="${id}">
+	<input type="hidden" name="image" th:field="*{image}" th:value="${image}">
+	<tr>
+		<td> Enter Category Name  </td>
+		<td> <input type="text" th:field="*{name}" th:value="${name}" class="form-control"> </td>
+		<td th:if="${#fields.hasErrors('name')}" th:errors="*{name}">Name Error</td>
+		
+	</tr>
+	
+	<tr>
+		<td> Current Photo  </td>
+		<td> 
+		      <ul>
+				  <li> <img src="data:image/jpeg;base64," th:attrappend="src=${img}" style="width:100px;height:auto;">  </li>
+			  </ul>	
+	    </td>
+		
+		
+	</tr>
+	
+	<tr>
+		<td> Upload New Photo  </td>
+		<td> <input type="file" name="new_photo" class="form-control"> </td>
+		
+		
+	</tr>
+	<tr>
+		<td>   </td>
+		<td> <button type="submit" class="btn btn-outline-warning form-control"> Update </button> </td>
+		
+	</tr>
+	
+</table>
+
+</form>
+
+    </div>
+    <div class="col-lg-6 p-5 text-center"> 
+		<i class="fa-solid fa-user-circle" style="font-size:100px;color:black;"></i>
+	</div>
+</div>
+</div>
+</body>
+</html>
+
+====================================================
+
+
+fragments
+	- header.html
+-----------------------
+
+
+<header th:fragment="header">
+	
+  <div class="container bg-secondary p-5 text-center text-white my-4">
+	  <h1> Upload Image Practice </h1>
+  </div>
+  <div class="container p-2">
+  <nav class="navbar navbar-expand-md bg-dark navbar-dark p-2">
+    <a class="navbar-brand" th:href="@{/category/}">
+      Home
+    </a>
+    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#topNavbar">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="topNavbar">
+      <ul class="navbar-nav">
+        <li class="nav-item">
+          <a class="nav-link" th:href="@{/category/create}">Create New</a>
+        </li>
+       
+      </ul>
+    </div>
+  </nav>
+   </div>
+   
+</header>	
+
+==========================================================
+
+
+template
+	- footer.html
+---------------------
+
+<footer class="text-center bg-dark p-2 text-white mt-5">
+  Copyright © Northern City. 2023
+</footer>
+
+
+========================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
